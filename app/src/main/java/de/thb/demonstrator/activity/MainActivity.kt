@@ -26,8 +26,9 @@ class MainActivity : ComponentActivity() {
         const val BUFFER_SIZE = "bufferSize"
         const val SENDING_TYPE = "sendingType"
         const val DATA_SIZE = "dataSize"
-        const val ERROR = "error"
+        const val COMMUNICATION_TYPE = "communicationType"
     }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -135,8 +136,7 @@ fun HomePreview() {
     ThroughputDemonstratorTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             val viewModel = HomeViewModel()
-            Home(viewModel){
-                    _, _ ->
+            Home(viewModel) { _, _ ->
             }
         }
     }
@@ -151,10 +151,10 @@ fun validateIpAddress(ipAddress: String): Boolean {
 }
 
 fun validatePort(port: String): Boolean {
-    if(port != "" && port.isDigitsOnly()){
+    if (port != "" && port.isDigitsOnly()) {
         val portInt = port.toInt()
         return portInt in 49152..65535;
-    }else{
+    } else {
         return false
     }
 

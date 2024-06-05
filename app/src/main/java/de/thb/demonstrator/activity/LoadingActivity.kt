@@ -16,20 +16,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import de.thb.demonstrator.activity.MainActivity.Companion.BUFFER_SIZE
+import de.thb.demonstrator.activity.MainActivity.Companion.COMMUNICATION_TYPE
 import de.thb.demonstrator.activity.MainActivity.Companion.DATA_SIZE
 import de.thb.demonstrator.activity.MainActivity.Companion.IP_ADDRESS_IDENTIFIER
 import de.thb.demonstrator.activity.MainActivity.Companion.PORT_IDENTIFIER
 import de.thb.demonstrator.activity.MainActivity.Companion.SENDING_TYPE
 import de.thb.demonstrator.client.Client
 import de.thb.demonstrator.client.ClientLoadingResult
-import de.thb.demonstrator.client.SendingType
+import de.thb.demonstrator.enums.CommunicationType
+import de.thb.demonstrator.enums.SendingType
 import de.thb.demonstrator.ui.theme.ThroughputDemonstratorTheme
 import de.thb.throughputdeomstrator.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 import kotlin.math.round
 
 class LoadingActivity : ComponentActivity() {
@@ -43,8 +43,9 @@ class LoadingActivity : ComponentActivity() {
         val port = intent.getIntExtra(PORT_IDENTIFIER, 0)
         val bufferSize = intent.getIntExtra(BUFFER_SIZE, 0)
         val sendingTypeString = intent.getStringExtra(SENDING_TYPE)
+        val communicationTypeString = intent.getStringExtra(COMMUNICATION_TYPE)
         val sendingType = SendingType.fromString(sendingTypeString)
-        println(sendingType)
+        val communicationType = CommunicationType.fromString(communicationTypeString)
         val dataSize = intent.getIntExtra(DATA_SIZE, 0)
 
         val client = Client()
@@ -56,6 +57,7 @@ class LoadingActivity : ComponentActivity() {
                         ipAddress = ipAddress ?: "",
                         port = port,
                         bufferSize = bufferSize,
+                        communicationType = communicationType,
                         sendingType = sendingType,
                         dataSize = dataSize,
                         path = path,
@@ -73,6 +75,7 @@ fun LoadingScreen(
     ipAddress: String,
     port: Int,
     bufferSize: Int,
+    communicationType: CommunicationType,
     sendingType: SendingType,
     dataSize: Int,
     path: String,
@@ -89,6 +92,7 @@ fun LoadingScreen(
         try {
             val time = withContext(Dispatchers.IO) {
                 client.startClient(
+                    communicationType,
                     sendingType,
                     bufferSize,
                     dataSize,
@@ -148,11 +152,18 @@ fun LoadingScreen(
                 Text("${clientLoadingResult?.seconds} Sekunden")
                 Text("und ${clientLoadingResult?.milliseconds} Millisekunden")
 
-                if(sendingType == SendingType.FILE){
+                if (sendingType == SendingType.FILE) {
                     Button(
                         modifier = Modifier.align(Alignment.CenterHorizontally),
                         onClick = {
-                            (context as? Activity)?.let { clientLoadingResult?.let { it1 -> openFile(context, it1.path) } }
+                            (context as? Activity)?.let {
+                                clientLoadingResult?.let { it1 ->
+                                    openFile(
+                                        context,
+                                        it1.path
+                                    )
+                                }
+                            }
                         },
                     ) {
                         Text("Datei öffnen")
@@ -163,7 +174,7 @@ fun LoadingScreen(
     }
 }
 
-fun openFile(context: Activity, path: String){
+fun openFile(context: Activity, path: String) {
 
     val intent = Intent(Intent.ACTION_VIEW)
     println(path)

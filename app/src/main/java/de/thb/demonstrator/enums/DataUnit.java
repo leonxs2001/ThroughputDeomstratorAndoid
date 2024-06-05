@@ -1,4 +1,4 @@
-package de.thb.demonstrator.client;
+package de.thb.demonstrator.enums;
 
 import org.jetbrains.annotations.NotNull;
 

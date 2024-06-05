@@ -1,4 +1,4 @@
-package de.thb.demonstrator.client;
+package de.thb.demonstrator.enums;
 
 public enum SendingType {
     FILE("file"),

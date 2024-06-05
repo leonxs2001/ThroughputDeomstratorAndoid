@@ -23,8 +23,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import de.thb.demonstrator.client.DataUnit
-import de.thb.demonstrator.client.SendingType
+import de.thb.demonstrator.enums.CommunicationType
+import de.thb.demonstrator.enums.DataUnit
+import de.thb.demonstrator.enums.SendingType
 import de.thb.demonstrator.ui.theme.ThroughputDemonstratorTheme
 import de.thb.throughputdeomstrator.R
 
@@ -40,19 +41,20 @@ class CreateConnectionActivity : ComponentActivity() {
         val resultLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == Activity.RESULT_CANCELED) {
                 viewModel.setShowError(true)
-            }else{
+            } else {
                 viewModel.setShowError(false)
             }
         }
         setContent {
             ThroughputDemonstratorTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    Connector(viewModel) { sendingType, bufferSize, dataSize ->
+                    Connector(viewModel) { communicationType, sendingType, bufferSize, dataSize ->
                         val intent = Intent(this, LoadingActivity::class.java).apply {
                             putExtra(MainActivity.IP_ADDRESS_IDENTIFIER, ipAddress)
                             putExtra(MainActivity.PORT_IDENTIFIER, port)
                             putExtra(MainActivity.BUFFER_SIZE, bufferSize)
                             putExtra(MainActivity.SENDING_TYPE, sendingType.toString())
+                            putExtra(MainActivity.COMMUNICATION_TYPE, communicationType.toString())
                             putExtra(MainActivity.DATA_SIZE, dataSize)
                         }
                         resultLauncher.launch(intent)
@@ -65,10 +67,19 @@ class CreateConnectionActivity : ComponentActivity() {
 
 class ConnectorViewModel : ViewModel() {
     private var _sendingType: MutableState<SendingType> = mutableStateOf(SendingType.DUMMY)
+    private var _communicationType: MutableState<CommunicationType> = mutableStateOf(CommunicationType.DOWNLOAD)
     private var _dataUnit: MutableState<DataUnit> = mutableStateOf(DataUnit.GB)
     private var _bufferSize: MutableState<String> = mutableStateOf("1024");
     private var _dataSize: MutableState<String> = mutableStateOf("1")
     private var _showError: MutableState<Boolean> = mutableStateOf(false)
+
+    fun getCommunicationType(): MutableState<CommunicationType> {
+        return _communicationType
+    }
+
+    fun setCommunicationType(communicationType: CommunicationType) {
+        _communicationType.value = communicationType
+    }
 
     fun isShowError(): MutableState<Boolean> {
         return _showError
@@ -114,13 +125,19 @@ class ConnectorViewModel : ViewModel() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Connector(viewModel: ConnectorViewModel, modifier: Modifier = Modifier, onSubmit: (SendingType, Int, Int) -> Unit) {
+fun Connector(
+    viewModel: ConnectorViewModel,
+    modifier: Modifier = Modifier,
+    onSubmit: (CommunicationType, SendingType, Int, Int) -> Unit
+) {
     val sendingTypeState = viewModel.getSendingType()
+    val communicationTypeState = viewModel.getCommunicationType()
     val bufferSizeState = viewModel.getBufferSize()
     val dataSizeState = viewModel.getDataSize()
     val dataUnitState = viewModel.getDataUnit()
     val sendingTypes = SendingType.entries.toTypedArray()
     val dataUnits = DataUnit.entries.toTypedArray()
+    val communicationTypes = CommunicationType.entries.toTypedArray()
     val context = LocalContext.current
 
     Box(
@@ -141,17 +158,19 @@ fun Connector(viewModel: ConnectorViewModel, modifier: Modifier = Modifier, onSu
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .padding(top = 175.dp)
+                .padding(top = 125.dp)
         ) {
             var expandedSendingType by remember { mutableStateOf(false) }
             var expandedDataUnit by remember { mutableStateOf(false) }
+            var expandedCommunicationType by remember { mutableStateOf(false) }
             val sendingType = sendingTypeState.value
+            val communicationType = communicationTypeState.value
             val bufferSize = bufferSizeState.value
             val dataSize = dataSizeState.value
             val dataUnit = dataUnitState.value
             val showError = viewModel.isShowError().value
 
-            if(showError) {
+            if (showError) {
                 Text(
                     text = "Es ist ein Fehler aufgetreten beim Laden",
                     color = Color.Red,
@@ -164,6 +183,37 @@ fun Connector(viewModel: ConnectorViewModel, modifier: Modifier = Modifier, onSu
                 modifier = Modifier.padding(16.dp).align(Alignment.CenterHorizontally),
                 fontSize = 24.sp
             )
+
+            ExposedDropdownMenuBox(
+                expanded = expandedCommunicationType,
+                onExpandedChange = {
+                    expandedCommunicationType = !expandedCommunicationType
+                },
+                modifier = Modifier.padding(bottom = 8.dp)
+            ) {
+                TextField(
+                    value = communicationType.toString(),
+                    onValueChange = {},
+                    readOnly = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedCommunicationType) },
+                    modifier = Modifier.menuAnchor()
+                )
+
+                ExposedDropdownMenu(
+                    expanded = expandedCommunicationType,
+                    onDismissRequest = { expandedCommunicationType = false }
+                ) {
+                    communicationTypes.forEach { type ->
+                        DropdownMenuItem(
+                            text = { Text(type.toString()) },
+                            onClick = {
+                                viewModel.setCommunicationType(type)
+                                expandedCommunicationType = false
+                            }
+                        )
+                    }
+                }
+            }
 
             ExposedDropdownMenuBox(
                 expanded = expandedSendingType,
@@ -270,9 +320,11 @@ fun Connector(viewModel: ConnectorViewModel, modifier: Modifier = Modifier, onSu
                     if (sendingType == SendingType.DUMMY) {
                         dataSizeRes = dataSize.toInt() * dataUnit.multiplier
                     }
-                    onSubmit(sendingType, bufferSize.toInt(), dataSizeRes)
+                    onSubmit(communicationType, sendingType, bufferSize.toInt(), dataSizeRes)
                 },
-                enabled = validateBufferOrDataSize(bufferSize) && (sendingType == SendingType.FILE || validateBufferOrDataSize(dataSize))
+                enabled = validateBufferOrDataSize(bufferSize) && (sendingType == SendingType.FILE || validateBufferOrDataSize(
+                    dataSize
+                ))
             ) {
                 Text("Starten")
             }
