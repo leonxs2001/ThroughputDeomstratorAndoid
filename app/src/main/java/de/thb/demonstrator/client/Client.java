@@ -75,8 +75,7 @@ public class Client {
                             clientLoadingResult = new ClientLoadingResult(0);
                         }
                     } else {
-                        sendFile(out, bufferSize, dataSize, in, loadObserver, fileUri, context.getContentResolver());
-                        clientLoadingResult = new ClientLoadingResult(0);
+                        clientLoadingResult = sendFile(out, bufferSize, dataSize, in, loadObserver, fileUri, context.getContentResolver());
                     }
                 }
                 return clientLoadingResult;
