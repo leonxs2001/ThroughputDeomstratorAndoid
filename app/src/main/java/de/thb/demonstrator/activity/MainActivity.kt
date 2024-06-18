@@ -27,6 +27,7 @@ class MainActivity : ComponentActivity() {
         const val SENDING_TYPE = "sendingType"
         const val DATA_SIZE = "dataSize"
         const val COMMUNICATION_TYPE = "communicationType"
+        const val FILE_URI = "fileUri"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -3,8 +3,8 @@ package de.thb.demonstrator.activity;
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -30,6 +30,7 @@ import de.thb.demonstrator.ui.theme.ThroughputDemonstratorTheme
 import de.thb.throughputdeomstrator.R
 
 class CreateConnectionActivity : ComponentActivity() {
+    private val viewModel:ConnectorViewModel; get() = ViewModelProvider(this).get(ConnectorViewModel::class.java)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -45,10 +46,10 @@ class CreateConnectionActivity : ComponentActivity() {
                 viewModel.setShowError(false)
             }
         }
-        setContent {
+       setContent {
             ThroughputDemonstratorTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    Connector(viewModel) { communicationType, sendingType, bufferSize, dataSize ->
+                    Connector(viewModel) { communicationType, sendingType, bufferSize, dataSize, fileUri ->
                         val intent = Intent(this, LoadingActivity::class.java).apply {
                             putExtra(MainActivity.IP_ADDRESS_IDENTIFIER, ipAddress)
                             putExtra(MainActivity.PORT_IDENTIFIER, port)
@@ -56,12 +57,25 @@ class CreateConnectionActivity : ComponentActivity() {
                             putExtra(MainActivity.SENDING_TYPE, sendingType.toString())
                             putExtra(MainActivity.COMMUNICATION_TYPE, communicationType.toString())
                             putExtra(MainActivity.DATA_SIZE, dataSize)
+                            putExtra(MainActivity.FILE_URI, fileUri)
+
                         }
                         resultLauncher.launch(intent)
                     }
                 }
             }
         }
+    }
+
+    private val filePickerLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        uri?.let {
+            // Hier können Sie den ausgewählten Datei-URI verwenden
+            viewModel.setFileUri(it)
+        }
+    }
+
+    fun pickFile() {
+        filePickerLauncher.launch(arrayOf("*/*"))
     }
 }
 
@@ -71,6 +85,7 @@ class ConnectorViewModel : ViewModel() {
     private var _dataUnit: MutableState<DataUnit> = mutableStateOf(DataUnit.GB)
     private var _bufferSize: MutableState<String> = mutableStateOf("1024");
     private var _dataSize: MutableState<String> = mutableStateOf("1")
+    private var _fileUri: MutableState<Uri> = mutableStateOf(Uri.EMPTY)
     private var _showError: MutableState<Boolean> = mutableStateOf(false)
 
     fun getCommunicationType(): MutableState<CommunicationType> {
@@ -121,6 +136,14 @@ class ConnectorViewModel : ViewModel() {
         _sendingType.value = sendingType
     }
 
+    fun getFileUri(): MutableState<Uri> {
+        return _fileUri
+    }
+
+    fun setFileUri(fileUri: Uri) {
+        _fileUri.value = fileUri
+    }
+
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -128,10 +151,11 @@ class ConnectorViewModel : ViewModel() {
 fun Connector(
     viewModel: ConnectorViewModel,
     modifier: Modifier = Modifier,
-    onSubmit: (CommunicationType, SendingType, Int, Int) -> Unit
+    onSubmit: (CommunicationType, SendingType, Int, Int, Uri) -> Unit
 ) {
     val sendingTypeState = viewModel.getSendingType()
     val communicationTypeState = viewModel.getCommunicationType()
+    val fileUri = viewModel.getFileUri()
     val bufferSizeState = viewModel.getBufferSize()
     val dataSizeState = viewModel.getDataSize()
     val dataUnitState = viewModel.getDataUnit()
@@ -246,6 +270,15 @@ fun Connector(
                 }
             }
 
+            if (sendingType == SendingType.FILE && communicationType == CommunicationType.UPLOAD) {
+                Button(
+                    onClick = { (context as? CreateConnectionActivity)?.pickFile() },
+                    modifier = Modifier.padding(bottom = 8.dp)
+                ) {
+                    Text("Datei auswählen")
+                }
+            }
+
             if (sendingType == SendingType.DUMMY) {
                 ExposedDropdownMenuBox(
                     expanded = expandedDataUnit,
@@ -320,7 +353,7 @@ fun Connector(
                     if (sendingType == SendingType.DUMMY) {
                         dataSizeRes = dataSize.toInt() * dataUnit.multiplier
                     }
-                    onSubmit(communicationType, sendingType, bufferSize.toInt(), dataSizeRes)
+                    onSubmit(communicationType, sendingType, bufferSize.toInt(), dataSizeRes, fileUri.value)
                 },
                 enabled = validateBufferOrDataSize(bufferSize) && (sendingType == SendingType.FILE || validateBufferOrDataSize(
                     dataSize

@@ -3,6 +3,7 @@ package de.thb.demonstrator.activity
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import androidx.activity.ComponentActivity
@@ -19,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import de.thb.demonstrator.activity.MainActivity.Companion.BUFFER_SIZE
 import de.thb.demonstrator.activity.MainActivity.Companion.COMMUNICATION_TYPE
 import de.thb.demonstrator.activity.MainActivity.Companion.DATA_SIZE
+import de.thb.demonstrator.activity.MainActivity.Companion.FILE_URI
 import de.thb.demonstrator.activity.MainActivity.Companion.IP_ADDRESS_IDENTIFIER
 import de.thb.demonstrator.activity.MainActivity.Companion.PORT_IDENTIFIER
 import de.thb.demonstrator.activity.MainActivity.Companion.SENDING_TYPE
@@ -47,6 +49,12 @@ class LoadingActivity : ComponentActivity() {
         val sendingType = SendingType.fromString(sendingTypeString)
         val communicationType = CommunicationType.fromString(communicationTypeString)
         val dataSize = intent.getIntExtra(DATA_SIZE, 0)
+        val fileUri =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(FILE_URI, Uri::class.java)
+            } else {
+                intent.getParcelableExtra(FILE_URI) as? Uri
+            }
 
         val client = Client()
 
@@ -61,6 +69,7 @@ class LoadingActivity : ComponentActivity() {
                         sendingType = sendingType,
                         dataSize = dataSize,
                         path = path,
+                        fileUri = fileUri,
                         client = client
                     )
                 }
@@ -79,6 +88,7 @@ fun LoadingScreen(
     sendingType: SendingType,
     dataSize: Int,
     path: String,
+    fileUri: Uri?,
     client: Client
 ) {
     var isLoading by remember { mutableStateOf(true) }
@@ -98,7 +108,9 @@ fun LoadingScreen(
                     dataSize,
                     ipAddress,
                     port,
-                    path
+                    path,
+                    fileUri,
+                    context
                 ) { loadPercentage ->
                     progressPercent = round(loadPercentage.toFloat() * 100) / 100
                     progress = (loadPercentage / 100).toFloat()
