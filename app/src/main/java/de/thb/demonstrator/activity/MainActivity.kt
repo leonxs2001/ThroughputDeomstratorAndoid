@@ -50,7 +50,7 @@ class MainActivity : ComponentActivity() {
 }
 
 class HomeViewModel : ViewModel() {
-    private var _ipAddress: MutableState<String> = mutableStateOf("192.168.137.1")
+    private var _ipAddress: MutableState<String> = mutableStateOf("192.168.178.41")
     private var _port: MutableState<String> = mutableStateOf("65432");
 
     fun getIpAddress(): MutableState<String> {

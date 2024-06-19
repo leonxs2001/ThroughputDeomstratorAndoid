@@ -30,7 +30,7 @@ import de.thb.demonstrator.ui.theme.ThroughputDemonstratorTheme
 import de.thb.throughputdeomstrator.R
 
 class CreateConnectionActivity : ComponentActivity() {
-    private val viewModel:ConnectorViewModel; get() = ViewModelProvider(this).get(ConnectorViewModel::class.java)
+    private val viewModel: ConnectorViewModel; get() = ViewModelProvider(this).get(ConnectorViewModel::class.java)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -46,7 +46,7 @@ class CreateConnectionActivity : ComponentActivity() {
                 viewModel.setShowError(false)
             }
         }
-       setContent {
+        setContent {
             ThroughputDemonstratorTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     Connector(viewModel) { communicationType, sendingType, bufferSize, dataSize, fileUri ->
@@ -80,8 +80,8 @@ class CreateConnectionActivity : ComponentActivity() {
 }
 
 class ConnectorViewModel : ViewModel() {
-    private var _sendingType: MutableState<SendingType> = mutableStateOf(SendingType.DUMMY)
-    private var _communicationType: MutableState<CommunicationType> = mutableStateOf(CommunicationType.DOWNLOAD)
+    private var _sendingType: MutableState<SendingType> = mutableStateOf(SendingType.FILE)
+    private var _communicationType: MutableState<CommunicationType> = mutableStateOf(CommunicationType.UPLOAD)
     private var _dataUnit: MutableState<DataUnit> = mutableStateOf(DataUnit.GB)
     private var _bufferSize: MutableState<String> = mutableStateOf("1024");
     private var _dataSize: MutableState<String> = mutableStateOf("1")
@@ -155,7 +155,7 @@ fun Connector(
 ) {
     val sendingTypeState = viewModel.getSendingType()
     val communicationTypeState = viewModel.getCommunicationType()
-    val fileUri = viewModel.getFileUri()
+    val fileUriState = viewModel.getFileUri()
     val bufferSizeState = viewModel.getBufferSize()
     val dataSizeState = viewModel.getDataSize()
     val dataUnitState = viewModel.getDataUnit()
@@ -191,6 +191,7 @@ fun Connector(
             val communicationType = communicationTypeState.value
             val bufferSize = bufferSizeState.value
             val dataSize = dataSizeState.value
+            val fileUri = fileUriState.value;
             val dataUnit = dataUnitState.value
             val showError = viewModel.isShowError().value
 
@@ -203,7 +204,7 @@ fun Connector(
             }
 
             Text(
-                text = "Was willst du herunterladen?",
+                text = "Was willst du tun?",
                 modifier = Modifier.padding(16.dp).align(Alignment.CenterHorizontally),
                 fontSize = 24.sp
             )
@@ -275,7 +276,11 @@ fun Connector(
                     onClick = { (context as? CreateConnectionActivity)?.pickFile() },
                     modifier = Modifier.padding(bottom = 8.dp)
                 ) {
-                    Text("Datei auswählen")
+                    var suffix = "";
+                    if (!Uri.EMPTY.equals(fileUri)) {
+                        suffix = "(ausgewählt)"
+                    }
+                    Text("Datei auswählen $suffix")
                 }
             }
 
@@ -353,11 +358,9 @@ fun Connector(
                     if (sendingType == SendingType.DUMMY) {
                         dataSizeRes = dataSize.toInt() * dataUnit.multiplier
                     }
-                    onSubmit(communicationType, sendingType, bufferSize.toInt(), dataSizeRes, fileUri.value)
+                    onSubmit(communicationType, sendingType, bufferSize.toInt(), dataSizeRes, fileUri)
                 },
-                enabled = validateBufferOrDataSize(bufferSize) && (sendingType == SendingType.FILE || validateBufferOrDataSize(
-                    dataSize
-                ))
+                enabled = isButtonEnabled(bufferSize, sendingType, dataSize, communicationType, fileUri)
             ) {
                 Text("Starten")
             }
@@ -383,4 +386,10 @@ fun validateBufferOrDataSize(bufferSize: String): Boolean {
     } else {
         return false
     }
+}
+
+fun isButtonEnabled(bufferSize: String, sendingType: SendingType, dataSize: String, communicationType: CommunicationType, fileUri: Uri): Boolean{
+    return validateBufferOrDataSize(bufferSize) && (sendingType == SendingType.FILE || validateBufferOrDataSize(dataSize)) && (sendingType == SendingType.DUMMY || communicationType == CommunicationType.DOWNLOAD || !Uri.EMPTY.equals(
+        fileUri
+    ))
 }

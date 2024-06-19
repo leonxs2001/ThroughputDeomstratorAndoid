@@ -1,12 +1,8 @@
 package de.thb.demonstrator.client;
 
-import android.content.ContentResolver;
-import android.content.Context;
-import android.net.Uri;
 import de.thb.demonstrator.enums.CommunicationType;
 import de.thb.demonstrator.enums.SendingType;
 import de.thb.demonstrator.exception.ServerNotReadyException;
-import kotlin.jvm.Throws;
 
 import java.io.*;
 import java.net.Socket;
@@ -37,19 +33,7 @@ public class Client {
         }
     }
 
-    public ClientLoadingResult startClient(CommunicationType communicationType, SendingType sendingType, int bufferSize, int dataSize, String host, int port, String filePath) {
-        return startClient(communicationType, sendingType, bufferSize, dataSize, host, port, filePath, null, null, null);
-    }
-
-    public ClientLoadingResult startClient(CommunicationType communicationType, SendingType sendingType, int bufferSize, int dataSize, String host, int port, LoadObserverInterface loadObserver) {
-        return startClient(communicationType, sendingType, bufferSize, dataSize, host, port, null, null, null, loadObserver);
-    }
-
-    public ClientLoadingResult startClient(CommunicationType communicationType, SendingType sendingType, int bufferSize, int dataSize, String host, int port) {
-        return startClient(communicationType, sendingType, bufferSize, dataSize, host, port, null, null, null, null);
-    }
-
-    public ClientLoadingResult startClient(CommunicationType communicationType, SendingType sendingType, int bufferSize, int dataSize, String host, int port, String filePath, Uri fileUri, Context context, LoadObserverInterface loadObserver) {
+    public ClientLoadingResult startClient(CommunicationType communicationType, SendingType sendingType, int bufferSize, int dataSize, String host, int port, String filePath, String filename, InputStream fileInputStream, LoadObserverInterface loadObserver) {
         try (Socket socket = new Socket(host, port)) {
             this.socket = socket;
             OutputStream out = socket.getOutputStream();
@@ -68,14 +52,15 @@ public class Client {
                     }
 
                 } else {
-                    if (communicationType == CommunicationType.DOWNLOAD) {
-                        if (filePath != null && !filePath.isEmpty()) {
+                    if (filePath != null && !filePath.isEmpty()) {
+                        System.out.println(filePath);
+                        if (communicationType == CommunicationType.DOWNLOAD) {
                             clientLoadingResult = receiveFile(out, bufferSize, in, filePath, loadObserver);
                         } else {
-                            clientLoadingResult = new ClientLoadingResult(0);
+                            clientLoadingResult = sendFile(out, bufferSize, dataSize, in, filename, fileInputStream, loadObserver);
                         }
                     } else {
-                        clientLoadingResult = sendFile(out, bufferSize, dataSize, in, loadObserver, fileUri, context.getContentResolver());
+                        clientLoadingResult = new ClientLoadingResult(0);
                     }
                 }
                 return clientLoadingResult;
@@ -137,7 +122,7 @@ public class Client {
         }
     }
 
-    private static ClientLoadingResult receiveDummyData(OutputStream out, int bufferSize, int dataSize, InputStream in, LoadObserverInterface loadObserver) throws IOException {
+    private ClientLoadingResult receiveDummyData(OutputStream out, int bufferSize, int dataSize, InputStream in, LoadObserverInterface loadObserver) throws IOException {
         out.write((bufferSize + ";" + dataSize).getBytes());
 
         long startTime = System.currentTimeMillis();
@@ -161,7 +146,8 @@ public class Client {
         return new ClientLoadingResult(endTime - startTime);
     }
 
-    private static ClientLoadingResult sendDummyData(OutputStream out, int bufferSize, int dataSize, InputStream in, LoadObserverInterface loadObserver) throws IOException, ServerNotReadyException {
+    private ClientLoadingResult sendDummyData(OutputStream out, int bufferSize, int dataSize, InputStream in, LoadObserverInterface loadObserver) throws IOException, ServerNotReadyException {
+
         out.write(String.valueOf(bufferSize).getBytes());
         int readySignal = in.read();
 
@@ -189,45 +175,33 @@ public class Client {
 
     }
 
-    public static ClientLoadingResult sendFile(OutputStream out, int bufferSize, int dataSize, InputStream in, LoadObserverInterface loadObserver, Uri fileUri, ContentResolver contentResolver) throws IOException, ServerNotReadyException {
-        out.write(String.valueOf(bufferSize).getBytes());
-
-        String filename = fileUri.getLastPathSegment();
-        System.out.println(filename);
-        out.write((filename+";").getBytes());
+    private ClientLoadingResult sendFile(OutputStream out, int bufferSize, int dataSize, InputStream in, String filename, InputStream fileInputStream, LoadObserverInterface loadObserver) throws IOException, ServerNotReadyException {
+        out.write((bufferSize + ";" + filename).getBytes());
 
         int readySignal = in.read();
 
         if (readySignal == 1) {
+
+            // Initialize variables for sending data
+            int sendDataSize = dataSize;
+            byte[] buffer = new byte[bufferSize];
+            int bytesRead;
+
             long startTime = System.currentTimeMillis();
+            while ((bytesRead = fileInputStream.read(buffer)) != -1) {
+                out.write(buffer, 0, bytesRead);
+                sendDataSize -= bytesRead;
 
-            // Open FileInputStream for the fileUri
-            try (InputStream fileInputStream = contentResolver.openInputStream(fileUri)) {
-                if (fileInputStream == null) {
-                    throw new IOException("Failed to open InputStream for URI: " + fileUri);
-                }
-
-                // Initialize variables for sending data
-                long sendDataSize = dataSize;
-                byte[] buffer = new byte[bufferSize];
-                int bytesRead;
-
-                while ((bytesRead = fileInputStream.read(buffer)) != -1) {
-                    out.write(buffer, 0, bytesRead);
-                    sendDataSize -= bytesRead;
-
-                    // Update loadObserver with progress
-                    if (loadObserver != null) {
-                        double progress = (dataSize - sendDataSize) * 100.0 / dataSize;
-                        loadObserver.update(progress);
-                    }
+                // Update loadObserver with progress
+                if (loadObserver != null) {
+                    double progress = (dataSize - sendDataSize) * 100.0 / dataSize;
+                    loadObserver.update(progress);
                 }
             }
-
             long endTime = System.currentTimeMillis();
             return new ClientLoadingResult(endTime - startTime);
         } else {
             throw new ServerNotReadyException("Server is not ready");
         }
-        }
+    }
 }

@@ -1,7 +1,5 @@
 package de.thb.demonstrator.enums;
 
-import org.jetbrains.annotations.NotNull;
-
 public enum CommunicationType {
     UPLOAD("upload"),
     DOWNLOAD("download");
@@ -29,7 +27,7 @@ public enum CommunicationType {
     }
 
 
-    public @NotNull String toString(){
+    public String toString(){
         return value;
     }
 }

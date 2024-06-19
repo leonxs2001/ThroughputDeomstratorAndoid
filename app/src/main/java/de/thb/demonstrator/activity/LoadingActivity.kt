@@ -1,11 +1,13 @@
 package de.thb.demonstrator.activity
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
@@ -29,17 +31,18 @@ import de.thb.demonstrator.client.ClientLoadingResult
 import de.thb.demonstrator.enums.CommunicationType
 import de.thb.demonstrator.enums.SendingType
 import de.thb.demonstrator.ui.theme.ThroughputDemonstratorTheme
+import de.thb.demonstrator.utils.FileNameSize
 import de.thb.throughputdeomstrator.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.InputStream
 import kotlin.math.round
+
 
 class LoadingActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        val path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath
 
         val ipAddress = intent.getStringExtra(IP_ADDRESS_IDENTIFIER)
         val port = intent.getIntExtra(PORT_IDENTIFIER, 0)
@@ -48,13 +51,23 @@ class LoadingActivity : ComponentActivity() {
         val communicationTypeString = intent.getStringExtra(COMMUNICATION_TYPE)
         val sendingType = SendingType.fromString(sendingTypeString)
         val communicationType = CommunicationType.fromString(communicationTypeString)
-        val dataSize = intent.getIntExtra(DATA_SIZE, 0)
+
         val fileUri =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 intent.getParcelableExtra(FILE_URI, Uri::class.java)
             } else {
                 intent.getParcelableExtra(FILE_URI) as? Uri
             }
+
+        var fileInputStream = fileUri?.let { this.contentResolver.openInputStream(it) };
+        val fileNameSize = fileUri?.let { getFileName(it) };
+
+        var dataSize = intent.getIntExtra(DATA_SIZE, 0)
+        if(sendingType == SendingType.FILE && communicationType == CommunicationType.UPLOAD && fileNameSize != null){
+            dataSize = fileNameSize.size
+        }
+
+        var path: String? = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath
 
         val client = Client()
 
@@ -69,12 +82,38 @@ class LoadingActivity : ComponentActivity() {
                         sendingType = sendingType,
                         dataSize = dataSize,
                         path = path,
-                        fileUri = fileUri,
+                        filename= fileNameSize?.filename,
+                        fileInputStream=fileInputStream,
                         client = client
                     )
                 }
             }
         }
+    }
+
+    @SuppressLint("Range")
+    fun getFileName(uri: Uri): FileNameSize {
+        var name: String? = null
+        var size: String? = null
+        if (uri.scheme == "content") {
+            val cursor = contentResolver.query(uri, null, null, null, null)
+            try {
+                if (cursor != null && cursor.moveToFirst()) {
+                    name = cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME))
+                    size = cursor.getString(cursor.getColumnIndex(OpenableColumns.SIZE))
+                }
+            } finally {
+                cursor!!.close()
+            }
+        }
+        if (name == null) {
+            name = uri.path
+            val cut = name!!.lastIndexOf('/')
+            if (cut != -1) {
+                name = name.substring(cut + 1)
+            }
+        }
+        return FileNameSize(name, size)
     }
 }
 
@@ -87,8 +126,9 @@ fun LoadingScreen(
     communicationType: CommunicationType,
     sendingType: SendingType,
     dataSize: Int,
-    path: String,
-    fileUri: Uri?,
+    path: String?,
+    filename: String?,
+    fileInputStream: InputStream?,
     client: Client
 ) {
     var isLoading by remember { mutableStateOf(true) }
@@ -109,8 +149,8 @@ fun LoadingScreen(
                     ipAddress,
                     port,
                     path,
-                    fileUri,
-                    context
+                    filename,
+                    fileInputStream
                 ) { loadPercentage ->
                     progressPercent = round(loadPercentage.toFloat() * 100) / 100
                     progress = (loadPercentage / 100).toFloat()
